@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Projectile Motion Simulation Game</title>
+    <title>Interactive Projectile Motion Simulation Game</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -17,6 +17,7 @@
         #gameCanvas {
             border: 1px solid #000;
             background-color: #fff;
+            cursor: pointer;
         }
         #controls {
             margin-left: 20px;
@@ -30,25 +31,19 @@
     <div>
         <canvas id="gameCanvas" width="800" height="400"></canvas>
         <div id="controls">
-            <label for="angleSlider">Angle: <span id="angleValue">45</span>°</label>
-            <input type="range" id="angleSlider" min="0" max="90" value="45"><br>
             <label for="velocitySlider">Velocity: <span id="velocityValue">50</span> m/s</label>
             <input type="range" id="velocitySlider" min="10" max="100" value="50"><br>
-            <label for="baseHeightSlider">Base Height: <span id="baseHeightValue">50</span> m</label>
-            <input type="range" id="baseHeightSlider" min="0" max="200" value="50"><br>
-            <label for="targetDistanceSlider">Target Distance: <span id="targetDistanceValue">300</span> m</label>
-            <input type="range" id="targetDistanceSlider" min="100" max="700" value="300"><br>
             <button id="fireButton">Fire!</button>
+            <p>Click and drag the cannon to adjust angle.</p>
+            <p>Click and drag the base to adjust height.</p>
+            <p>Click and drag the target to adjust distance.</p>
         </div>
     </div>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const angleSlider = document.getElementById('angleSlider');
         const velocitySlider = document.getElementById('velocitySlider');
-        const baseHeightSlider = document.getElementById('baseHeightSlider');
-        const targetDistanceSlider = document.getElementById('targetDistanceSlider');
         const fireButton = document.getElementById('fireButton');
 
         let angle = 45;
@@ -60,11 +55,11 @@
         let time = 0;
         let animationId = null;
 
-        function updateSliderValues() {
-            document.getElementById('angleValue').textContent = angle;
+        let isDragging = false;
+        let dragTarget = null;
+
+        function updateVelocityValue() {
             document.getElementById('velocityValue').textContent = velocity;
-            document.getElementById('baseHeightValue').textContent = baseHeight;
-            document.getElementById('targetDistanceValue').textContent = targetDistance;
         }
 
         function drawScene() {
@@ -101,6 +96,13 @@
                 ctx.arc(projectileX, canvas.height - projectileY, 5, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            // Draw labels
+            ctx.fillStyle = 'black';
+            ctx.font = '14px Arial';
+            ctx.fillText(`Angle: ${angle.toFixed(1)}°`, 10, 20);
+            ctx.fillText(`Base Height: ${baseHeight.toFixed(1)}m`, 10, 40);
+            ctx.fillText(`Target Distance: ${targetDistance.toFixed(1)}m`, 10, 60);
         }
 
         function updateProjectile() {
@@ -141,33 +143,68 @@
             updateProjectile();
         }
 
-        angleSlider.addEventListener('input', () => {
-            angle = parseInt(angleSlider.value);
-            updateSliderValues();
+        function handleMouseDown(e) {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            if (Math.sqrt(Math.pow(mouseX - 25, 2) + Math.pow(mouseY - (canvas.height - baseHeight), 2)) < 20) {
+                isDragging = true;
+                dragTarget = 'cannon';
+            } else if (mouseX < 50 && mouseY > canvas.height - baseHeight) {
+                isDragging = true;
+                dragTarget = 'base';
+            } else if (Math.sqrt(Math.pow(mouseX - targetDistance, 2) + Math.pow(mouseY - (canvas.height - 20), 2)) < 20) {
+                isDragging = true;
+                dragTarget = 'target';
+            }
+        }
+
+        function handleMouseMove(e) {
+            if (!isDragging) return;
+
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            switch (dragTarget) {
+                case 'cannon':
+                    const dx = mouseX - 25;
+                    const dy = (canvas.height - baseHeight) - mouseY;
+                    angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    angle = Math.max(0, Math.min(90, angle));
+                    break;
+                case 'base':
+                    baseHeight = canvas.height - mouseY;
+                    baseHeight = Math.max(10, Math.min(200, baseHeight));
+                    break;
+                case 'target':
+                    targetDistance = mouseX;
+                    targetDistance = Math.max(100, Math.min(700, targetDistance));
+                    break;
+            }
+
             drawScene();
-        });
+        }
+
+        function handleMouseUp() {
+            isDragging = false;
+            dragTarget = null;
+        }
 
         velocitySlider.addEventListener('input', () => {
             velocity = parseInt(velocitySlider.value);
-            updateSliderValues();
-            drawScene();
-        });
-
-        baseHeightSlider.addEventListener('input', () => {
-            baseHeight = parseInt(baseHeightSlider.value);
-            updateSliderValues();
-            drawScene();
-        });
-
-        targetDistanceSlider.addEventListener('input', () => {
-            targetDistance = parseInt(targetDistanceSlider.value);
-            updateSliderValues();
-            drawScene();
+            updateVelocityValue();
         });
 
         fireButton.addEventListener('click', fireProjectile);
 
-        updateSliderValues();
+        canvas.addEventListener('mousedown', handleMouseDown);
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('mouseup', handleMouseUp);
+        canvas.addEventListener('mouseleave', handleMouseUp);
+
+        updateVelocityValue();
         drawScene();
     </script>
 </body>
