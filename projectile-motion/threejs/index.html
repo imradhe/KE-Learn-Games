@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js 2D Projectile Motion Simulation Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+        #gameContainer {
+            width: 100%;
+            max-width: 800px;
+            margin: 10px auto;
+        }
+        #controls {
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 10px 0;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        p {
+            margin: 5px 0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer"></div>
+    <div id="controls">
+        <label for="velocitySlider">Velocity: <span id="velocityValue">50</span> m/s</label>
+        <input type="range" id="velocitySlider" min="10" max="100" value="50">
+        <button id="fireButton">Fire!</button>
+        <p>Click and drag the cannon to adjust angle.</p>
+        <p>Click and drag the base to adjust height.</p>
+        <p>Click and drag the target to adjust distance.</p>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        const scene = new THREE.Scene();
+        const camera = new THREE.OrthographicCamera(0, 800, 400, 0, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        const gameContainer = document.getElementById('gameContainer');
+        const velocitySlider = document.getElementById('velocitySlider');
+        const fireButton = document.getElementById('fireButton');
+
+        let angle = 45;
+        let velocity = 50;
+        let baseHeight = 50;
+        let targetDistance = 300;
+        let projectileX = 0;
+        let projectileY = 0;
+        let time = 0;
+        let animationId = null;
+
+        let isDragging = false;
+        let dragTarget = null;
+
+        const CANNON_RADIUS = 20;
+        const MIN_BASE_HEIGHT = 10;
+        const MAX_BASE_HEIGHT = 200;
+
+        // Three.js objects
+        const sky = new THREE.Mesh(
+            new THREE.PlaneGeometry(1600, 800),
+            new THREE.MeshBasicMaterial({ color: 0x87CEEB })
+        );
+        const land = new THREE.Mesh(
+            new THREE.PlaneGeometry(1600, 60),
+            new THREE.MeshBasicMaterial({ color: 0x32CD32 })
+        );
+        const base = new THREE.Mesh(
+            new THREE.BoxGeometry(50, baseHeight, 1),
+            new THREE.MeshBasicMaterial({ color: 0x8B4513 })
+        );
+        const cannon = new THREE.Mesh(
+            new THREE.CircleGeometry(CANNON_RADIUS, 32),
+            new THREE.MeshBasicMaterial({ color: 0x808080 })
+        );
+        const cannonBarrel = new THREE.Mesh(
+            new THREE.BoxGeometry(40, 5, 1),
+            new THREE.MeshBasicMaterial({ color: 0x000000 })
+        );
+        const target = new THREE.Mesh(
+            new THREE.CircleGeometry(20, 32),
+            new THREE.MeshBasicMaterial({ color: 0xFF0000 })
+        );
+        const projectile = new THREE.Mesh(
+            new THREE.CircleGeometry(5, 32),
+            new THREE.MeshBasicMaterial({ color: 0x000000 })
+        );
+
+        scene.add(sky);
+        scene.add(land);
+        scene.add(base);
+        scene.add(cannon);
+        scene.add(cannonBarrel);
+        scene.add(target);
+        scene.add(projectile);
+
+        projectile.visible = false;
+
+        function init() {
+            camera.position.z = 5;
+            renderer.setSize(800, 400);
+            gameContainer.appendChild(renderer.domElement);
+
+            updateScene();
+            animate();
+
+            window.addEventListener('resize', onWindowResize, false);
+            renderer.domElement.addEventListener('mousedown', handleStart);
+            renderer.domElement.addEventListener('mousemove', handleMove);
+            renderer.domElement.addEventListener('mouseup', handleEnd);
+            renderer.domElement.addEventListener('touchstart', handleStart);
+            renderer.domElement.addEventListener('touchmove', handleMove);
+            renderer.domElement.addEventListener('touchend', handleEnd);
+        }
+
+        function onWindowResize() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const frustumHeight = 400;
+            const frustumWidth = frustumHeight * aspect;
+            camera.left = 0;
+            camera.right = frustumWidth;
+            camera.top = 400;
+            camera.bottom = 0;
+            camera.updateProjectionMatrix();
+            renderer.setSize(frustumWidth, 400);
+            updateScene();
+        }
+
+        function updateScene() {
+            base.geometry = new THREE.BoxGeometry(50, baseHeight, 1);
+            base.position.set(25, baseHeight / 2, 0);
+
+            cannon.position.set(25, baseHeight, 0);
+            
+            cannonBarrel.position.set(25, baseHeight, 0);
+            cannonBarrel.geometry = new THREE.BoxGeometry(40, 5, 1);
+            cannonBarrel.rotation.z = (90 - angle) * Math.PI / 180;
+            cannonBarrel.position.x = 25 + Math.cos((90 - angle) * Math.PI / 180) * 20;
+            cannonBarrel.position.y = baseHeight + Math.sin((90 - angle) * Math.PI / 180) * 20;
+
+            target.position.set(targetDistance, 20, 0);
+
+            updateLabels();
+        }
+
+        function updateLabels() {
+            // Remove existing labels
+            scene.children.forEach(child => {
+                if (child.isSprite) scene.remove(child);
+            });
+
+            // Create new labels
+            createLabel(`Angle: ${angle.toFixed(1)}°`, 10, 380);
+            createLabel(`Base Height: ${baseHeight.toFixed(1)}m`, 10, 360);
+            createLabel(`Target Distance: ${targetDistance.toFixed(1)}m`, 10, 340);
+        }
+
+        function createLabel(text, x, y) {
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            context.font = '32px Arial';
+            context.fillStyle = 'black';
+            context.fillText(text, 0, 24);
+            
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture });
+            const sprite = new THREE.Sprite(material);
+            
+            sprite.scale.set(100, 50, 1);
+            sprite.position.set(x + 50, y - 20, 1);
+            scene.add(sprite);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+
+        function updateProjectile() {
+            const g = 9.8; // Acceleration due to gravity (m/s^2)
+            const radianAngle = angle * Math.PI / 180;
+
+            projectileX = 25 + velocity * Math.cos(radianAngle) * time;
+            projectileY = baseHeight + (velocity * Math.sin(radianAngle) * time) - (0.5 * g * time * time);
+
+            projectile.position.set(projectileX, projectileY, 0);
+
+            if (projectileY < 0 || projectileX > 800) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                projectile.visible = false;
+                checkHit();
+            } else {
+                time += 0.1;
+                animationId = requestAnimationFrame(updateProjectile);
+            }
+        }
+
+        function checkHit() {
+            const distance = Math.sqrt(Math.pow(projectileX - targetDistance, 2) + Math.pow(projectileY - 20, 2));
+            if (distance < 25) {
+                alert('Hit! Great shot!');
+            } else {
+                alert('Miss! Try again.');
+            }
+        }
+
+        function fireProjectile() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            projectileX = 25;
+            projectileY = baseHeight;
+            time = 0;
+            projectile.visible = true;
+            updateProjectile();
+        }
+
+        function handleStart(e) {
+            e.preventDefault();
+            const rect = renderer.domElement.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+
+            if (Math.sqrt(Math.pow(mouseX - 25, 2) + Math.pow(mouseY - (400 - baseHeight), 2)) < CANNON_RADIUS) {
+                isDragging = true;
+                dragTarget = 'cannon';
+            } else if (mouseX < 50 && mouseY > 400 - MAX_BASE_HEIGHT) {
+                isDragging = true;
+                dragTarget = 'base';
+            } else if (Math.sqrt(Math.pow(mouseX - targetDistance, 2) + Math.pow(mouseY - (400 - 20), 2)) < 20) {
+                isDragging = true;
+                dragTarget = 'target';
+            }
+        }
+
+        function handleMove(e) {
+            e.preventDefault();
+            if (!isDragging) return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            const mouseX = touch.clientX - rect.left;
+            const mouseY = touch.clientY - rect.top;
+
+            switch (dragTarget) {
+                case 'cannon':
+                    const dx = mouseX - 25;
+                    const dy = (400 - baseHeight) - mouseY;
+                    angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    angle = Math.max(0, Math.min(90, angle));
+                    break;
+                case 'base':
+                    baseHeight = 400 - mouseY;
+                    baseHeight = Math.max(MIN_BASE_HEIGHT, Math.min(MAX_BASE_HEIGHT, baseHeight));
+                    break;
+                case 'target':
+                    targetDistance = mouseX;
+                    targetDistance = Math.max(100, Math.min(700, targetDistance));
+                    break;
+            }
+
+            updateScene();
+        }
+
+        function handleEnd() {
+            isDragging = false;
+            dragTarget = null;
+        }
+
+        velocitySlider.addEventListener('input', () => {
+            velocity = parseInt(velocitySlider.value);
+            document.getElementById('velocityValue').textContent = velocity;
+        });
+
+        fireButton.addEventListener('click', fireProjectile);
+
+        init();
+    </script>
+</body>
+</html>

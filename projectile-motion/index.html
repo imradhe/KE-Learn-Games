@@ -103,14 +103,14 @@
             // Draw cannon
             ctx.fillStyle = 'gray';
             ctx.beginPath();
-            ctx.arc(25 * scale, canvas.height - baseHeight * scale, 20 * scale, 0, Math.PI * 2);
+            ctx.arc(25 * scale, canvas.height - (baseHeight) * scale, 20 * scale, 0, Math.PI * 2);
             ctx.fill();
 
             // Draw cannon barrel
             ctx.strokeStyle = 'black';
             ctx.lineWidth = 5 * scale;
             ctx.beginPath();
-            ctx.moveTo(25 * scale, canvas.height - baseHeight * scale);
+            ctx.moveTo(25 * scale, canvas.height - (baseHeight) * scale);
             ctx.lineTo(25 * scale + Math.cos((90 - angle) * Math.PI / 180) * 40 * scale, 
                        canvas.height - baseHeight * scale - Math.sin((90 - angle) * Math.PI / 180) * 40 * scale);
             ctx.stroke();
