@@ -3,40 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Interactive Projectile Motion Simulation Game</title>
+    <title>Mobile-Responsive Projectile Motion Simulation Game</title>
     <style>
         body {
             font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
             margin: 0;
+            padding: 0;
             background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        #gameContainer {
+            width: 100%;
+            max-width: 800px;
+            margin: 10px auto;
         }
         #gameCanvas {
+            width: 100%;
+            height: auto;
             border: 1px solid #000;
             background-color: #fff;
-            cursor: pointer;
+            touch-action: none;
         }
         #controls {
-            margin-left: 20px;
+            width: 100%;
+            max-width: 800px;
+            padding: 10px;
+            box-sizing: border-box;
         }
         input[type="range"] {
-            width: 200px;
+            width: 100%;
+            margin: 10px 0;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+        p {
+            margin: 5px 0;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <div>
-        <canvas id="gameCanvas" width="800" height="400"></canvas>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
         <div id="controls">
             <label for="velocitySlider">Velocity: <span id="velocityValue">50</span> m/s</label>
-            <input type="range" id="velocitySlider" min="10" max="100" value="50"><br>
+            <input type="range" id="velocitySlider" min="10" max="100" value="50">
             <button id="fireButton">Fire!</button>
-            <p>Click and drag the cannon to adjust angle.</p>
-            <p>Click and drag the base to adjust height.</p>
-            <p>Click and drag the target to adjust distance.</p>
+            <p>Tap and drag the cannon to adjust angle.</p>
+            <p>Tap and drag the base to adjust height.</p>
+            <p>Tap and drag the target to adjust distance.</p>
         </div>
     </div>
 
@@ -58,6 +80,13 @@
         let isDragging = false;
         let dragTarget = null;
 
+        // Set canvas size
+        function resizeCanvas() {
+            canvas.width = canvas.offsetWidth;
+            canvas.height = canvas.width / 2;
+            drawScene();
+        }
+
         function updateVelocityValue() {
             document.getElementById('velocityValue').textContent = velocity;
         }
@@ -65,44 +94,47 @@
         function drawScene() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+            const scale = canvas.width / 800;
+
             // Draw base
             ctx.fillStyle = 'brown';
-            ctx.fillRect(0, canvas.height - baseHeight, 50, baseHeight);
+            ctx.fillRect(0, canvas.height - baseHeight * scale, 50 * scale, baseHeight * scale);
 
             // Draw cannon
             ctx.fillStyle = 'gray';
             ctx.beginPath();
-            ctx.arc(25, canvas.height - baseHeight, 20, 0, Math.PI * 2);
+            ctx.arc(25 * scale, canvas.height - baseHeight * scale, 20 * scale, 0, Math.PI * 2);
             ctx.fill();
 
             // Draw cannon barrel
             ctx.strokeStyle = 'black';
-            ctx.lineWidth = 5;
+            ctx.lineWidth = 5 * scale;
             ctx.beginPath();
-            ctx.moveTo(25, canvas.height - baseHeight);
-            ctx.lineTo(25 + Math.cos((90 - angle) * Math.PI / 180) * 40, canvas.height - baseHeight - Math.sin((90 - angle) * Math.PI / 180) * 40);
+            ctx.moveTo(25 * scale, canvas.height - baseHeight * scale);
+            ctx.lineTo(25 * scale + Math.cos((90 - angle) * Math.PI / 180) * 40 * scale, 
+                       canvas.height - baseHeight * scale - Math.sin((90 - angle) * Math.PI / 180) * 40 * scale);
             ctx.stroke();
 
             // Draw target
             ctx.fillStyle = 'red';
             ctx.beginPath();
-            ctx.arc(targetDistance, canvas.height - 20, 20, 0, Math.PI * 2);
+            ctx.arc(targetDistance * scale, canvas.height - 20 * scale, 20 * scale, 0, Math.PI * 2);
             ctx.fill();
 
             // Draw projectile
             if (animationId) {
                 ctx.fillStyle = 'black';
                 ctx.beginPath();
-                ctx.arc(projectileX, canvas.height - projectileY, 5, 0, Math.PI * 2);
+                ctx.arc(projectileX * scale, canvas.height - projectileY * scale, 5 * scale, 0, Math.PI * 2);
                 ctx.fill();
             }
 
             // Draw labels
             ctx.fillStyle = 'black';
-            ctx.font = '14px Arial';
-            ctx.fillText(`Angle: ${angle.toFixed(1)}°`, 10, 20);
-            ctx.fillText(`Base Height: ${baseHeight.toFixed(1)}m`, 10, 40);
-            ctx.fillText(`Target Distance: ${targetDistance.toFixed(1)}m`, 10, 60);
+            ctx.font = `${14 * scale}px Arial`;
+            ctx.fillText(`Angle: ${angle.toFixed(1)}°`, 10 * scale, 20 * scale);
+            ctx.fillText(`Base Height: ${baseHeight.toFixed(1)}m`, 10 * scale, 40 * scale);
+            ctx.fillText(`Target Distance: ${targetDistance.toFixed(1)}m`, 10 * scale, 60 * scale);
         }
 
         function updateProjectile() {
@@ -112,7 +144,7 @@
             projectileX = velocity * Math.cos(radianAngle) * time;
             projectileY = baseHeight + (velocity * Math.sin(radianAngle) * time) - (0.5 * g * time * time);
 
-            if (projectileY < 0 || projectileX > canvas.width) {
+            if (projectileY < 0 || projectileX > 800) {
                 cancelAnimationFrame(animationId);
                 animationId = null;
                 checkHit();
@@ -143,39 +175,45 @@
             updateProjectile();
         }
 
-        function handleMouseDown(e) {
+        function handleStart(e) {
+            e.preventDefault();
             const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const scale = 800 / canvas.width;
+            const touch = e.touches ? e.touches[0] : e;
+            const mouseX = (touch.clientX - rect.left) * scale;
+            const mouseY = (touch.clientY - rect.top) * scale;
 
-            if (Math.sqrt(Math.pow(mouseX - 25, 2) + Math.pow(mouseY - (canvas.height - baseHeight), 2)) < 20) {
+            if (Math.sqrt(Math.pow(mouseX - 25, 2) + Math.pow(mouseY - (400 - baseHeight), 2)) < 20) {
                 isDragging = true;
                 dragTarget = 'cannon';
-            } else if (mouseX < 50 && mouseY > canvas.height - baseHeight) {
+            } else if (mouseX < 50 && mouseY > 400 - baseHeight) {
                 isDragging = true;
                 dragTarget = 'base';
-            } else if (Math.sqrt(Math.pow(mouseX - targetDistance, 2) + Math.pow(mouseY - (canvas.height - 20), 2)) < 20) {
+            } else if (Math.sqrt(Math.pow(mouseX - targetDistance, 2) + Math.pow(mouseY - (400 - 20), 2)) < 20) {
                 isDragging = true;
                 dragTarget = 'target';
             }
         }
 
-        function handleMouseMove(e) {
+        function handleMove(e) {
+            e.preventDefault();
             if (!isDragging) return;
 
             const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
+            const scale = 800 / canvas.width;
+            const touch = e.touches ? e.touches[0] : e;
+            const mouseX = (touch.clientX - rect.left) * scale;
+            const mouseY = (touch.clientY - rect.top) * scale;
 
             switch (dragTarget) {
                 case 'cannon':
                     const dx = mouseX - 25;
-                    const dy = (canvas.height - baseHeight) - mouseY;
+                    const dy = (400 - baseHeight) - mouseY;
                     angle = Math.atan2(dy, dx) * 180 / Math.PI;
                     angle = Math.max(0, Math.min(90, angle));
                     break;
                 case 'base':
-                    baseHeight = canvas.height - mouseY;
+                    baseHeight = 400 - mouseY;
                     baseHeight = Math.max(10, Math.min(200, baseHeight));
                     break;
                 case 'target':
@@ -187,7 +225,7 @@
             drawScene();
         }
 
-        function handleMouseUp() {
+        function handleEnd() {
             isDragging = false;
             dragTarget = null;
         }
@@ -199,11 +237,20 @@
 
         fireButton.addEventListener('click', fireProjectile);
 
-        canvas.addEventListener('mousedown', handleMouseDown);
-        canvas.addEventListener('mousemove', handleMouseMove);
-        canvas.addEventListener('mouseup', handleMouseUp);
-        canvas.addEventListener('mouseleave', handleMouseUp);
+        // Mouse events
+        canvas.addEventListener('mousedown', handleStart);
+        canvas.addEventListener('mousemove', handleMove);
+        canvas.addEventListener('mouseup', handleEnd);
+        canvas.addEventListener('mouseleave', handleEnd);
 
+        // Touch events
+        canvas.addEventListener('touchstart', handleStart);
+        canvas.addEventListener('touchmove', handleMove);
+        canvas.addEventListener('touchend', handleEnd);
+        canvas.addEventListener('touchcancel', handleEnd);
+
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
         updateVelocityValue();
         drawScene();
     </script>
